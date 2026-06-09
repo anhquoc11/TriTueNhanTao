@@ -116,13 +116,20 @@ def logs_to_visited(logs):
 
 def compute_path_to_target(start, target, grid, algo):
     temp_grid = [list(row) for row in grid]
-    # Ensure only the current target is marked as the goal
+    # Clear existing goal markers (warehouse or any temporary target markers)
     for i in range(len(temp_grid)):
         for j in range(len(temp_grid[i])):
             if temp_grid[i][j] == 4:
                 temp_grid[i][j] = 0
-    tx, ty = target
-    temp_grid[tx][ty] = 4
+
+    # Support a single target or multiple targets
+    if isinstance(target, tuple):
+        tx, ty = target
+        temp_grid[tx][ty] = 4
+    else:
+        for tx, ty in target:
+            if 0 <= tx < len(temp_grid) and 0 <= ty < len(temp_grid[0]):
+                temp_grid[tx][ty] = 4
 
     start_state = (start[0], start[1], tuple(tuple(row) for row in temp_grid))
     t0 = time.time()
@@ -310,45 +317,38 @@ def main():
         # Handle delivery state transitions
         now = pygame.time.get_ticks()
         if path and delivery_state != "IDLE":
-            # Check if animation finished
             step = (now - anim_time) // 150
-            if step >= len(path):
+            step = min(step, len(path) - 1)
+
+            # Mark houses delivered as the drone reaches them on the current path
+            if delivery_state == "DELIVERING":
+                dx, dy = path[step]
+                if (dx, dy) in houses and (dx, dy) not in delivered_houses:
+                    delivered_count += 1
+                    delivered_houses.append((dx, dy))
+                    houses = [h for h in houses if h != (dx, dy)]
+                    grid[dx][dy] = 0
+                    delivery_log.append(f"[DELIVERED] House #{delivered_count} at ({dx}, {dy})")
+
+            # Check if animation finished
+            if (now - anim_time) // 150 >= len(path):
                 # Drone reached goal
                 if delivery_state == "PICKING":
                     delivery_log.append(f"[PICKED UP] At Warehouse. Now delivering all houses...")
                     if houses:
                         delivery_state = "DELIVERING"
-                        # Create delivery order: visit all remaining houses
-                        delivery_targets = houses.copy()  # All houses in order
-                        current_target = delivery_targets[0]
-                        delivery_log.append(f"[DELIVERING] Tour Start → House #{1} at ({current_target[0]}, {current_target[1]})")
+                        current_target = houses
+                        delivery_log.append(f"[DELIVERING] Planning route for {len(houses)} houses...")
                         state_change_time = now
                     else:
                         delivery_state = "IDLE"
                         delivery_log.append("[DONE] No houses to deliver")
 
                 elif delivery_state == "DELIVERING":
-                    # Mark house as delivered
-                    delivered_count += 1
-                    delivery_log.append(f"[DELIVERED] House #{delivered_count} at ({current_target[0]}, {current_target[1]})")
-                    delivered_houses.append(current_target)
-                    grid[current_target[0]][current_target[1]] = 0
-                    
-                    # Check if there are more houses to deliver
-                    if houses and current_target == houses[0]:
-                        houses.pop(0)
-                    
-                    if houses:
-                        # Go to next house (no return to warehouse)
-                        current_target = houses[0]
-                        delivery_log.append(f"[DELIVERING] → House #{delivered_count + 1} at ({current_target[0]}, {current_target[1]})")
-                        state_change_time = now
-                    else:
-                        # All houses delivered, return to base
-                        delivery_state = "RETURNING"
-                        current_target = base
-                        delivery_log.append(f"[RETURNING] All delivered! Flying back to Base at ({base[0]}, {base[1]})")
-                        state_change_time = now
+                    delivery_state = "RETURNING"
+                    current_target = base
+                    delivery_log.append(f"[RETURNING] All delivered! Flying back to Base at ({base[0]}, {base[1]})")
+                    state_change_time = now
 
                 elif delivery_state == "RETURNING":
                     # Returned to base, mission complete
@@ -451,13 +451,18 @@ def main():
             pygame.draw.rect(screen, (120, 180, 255), rect)
             pygame.draw.circle(screen, (0, 80, 200), (grid_x0 + y*CELL_SIZE + CELL_SIZE//2, grid_y0 + x*CELL_SIZE + CELL_SIZE//2), max(2, CELL_SIZE//4))
 
-        # highlight current delivery target
+        # highlight current delivery target(s)
         if current_target is not None and delivery_state in ("DELIVERING", "PICKING", "RETURNING"):
-            tx, ty = current_target
-            rect = pygame.Rect(grid_x0 + ty*CELL_SIZE, grid_y0 + tx*CELL_SIZE, CELL_SIZE-1, CELL_SIZE-1)
-            pygame.draw.rect(screen, (255, 140, 0), rect, 3)
+            if isinstance(current_target, list):
+                for tx, ty in current_target:
+                    rect = pygame.Rect(grid_x0 + ty*CELL_SIZE, grid_y0 + tx*CELL_SIZE, CELL_SIZE-1, CELL_SIZE-1)
+                    pygame.draw.rect(screen, (255, 140, 0), rect, 2)
+            else:
+                tx, ty = current_target
+                rect = pygame.Rect(grid_x0 + ty*CELL_SIZE, grid_y0 + tx*CELL_SIZE, CELL_SIZE-1, CELL_SIZE-1)
+                pygame.draw.rect(screen, (255, 140, 0), rect, 3)
 
-# draw warehouse(s), house and buildings/nofly/tree icons where applicable
+        # draw warehouse(s), house and buildings/nofly/tree icons where applicable
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
                 cell = grid[i][j]
