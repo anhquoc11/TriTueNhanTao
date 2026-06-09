@@ -2,6 +2,7 @@ from .base import BaseAlg
 
 class LocalBeamSearch(BaseAlg):
     def __init__(self, k=3):
+        super().__init__()
         self.k = k
 
     def solve(self, start_state):

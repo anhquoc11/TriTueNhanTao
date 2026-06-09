@@ -54,7 +54,8 @@ class BaseAlg(ABC):
         elif (action == "RIGHT"):
             y += 1
         elif (action == "CLEAN"):
-            dirt[x][y] = 0
+            if 0 <= x < len(dirt) and 0 <= y < len(dirt[0]):
+                dirt[x][y] = 0
 
         return (x, y, tuple(tuple(row) for row in dirt))
 

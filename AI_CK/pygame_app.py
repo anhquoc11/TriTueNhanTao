@@ -126,7 +126,12 @@ def compute_path_to_target(start, target, grid, algo):
 
     start_state = (start[0], start[1], tuple(tuple(row) for row in temp_grid))
     t0 = time.time()
-    result_path, logs = algo.solve(start_state)
+    try:
+        result_path, logs = algo.solve(start_state)
+    except Exception as e:
+        print(f"Error solving path: {e}")
+        return [], 0, set(), int((time.time() - t0) * 1000)
+    
     t1 = time.time()
     runtime_ms = int((t1 - t0) * 1000)
     visited = logs_to_visited(logs)
@@ -205,6 +210,14 @@ def main():
     anim_index = 0
     anim_time = 0
     
+    # Dropdown state
+    algo_options = list(ALG_MAP.keys())  # Get all algorithms
+    dropdown_open = False
+    dropdown_rect = None
+    options_rects = []
+    dropdown_scroll_offset = 0
+    max_visible_items = 5
+    
     # Delivery state machine
     delivery_state = "IDLE"  # IDLE, PICKING, DELIVERING, RETURNING
     current_target = None  # (x, y) of current target
@@ -217,6 +230,25 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    if dropdown_rect and dropdown_rect.collidepoint(event.pos):
+                        dropdown_open = not dropdown_open
+                        dropdown_scroll_offset = 0  # Reset scroll when opening
+                    elif dropdown_open:
+                        for i, opt_rect in enumerate(options_rects):
+                            if opt_rect.collidepoint(event.pos):
+                                selected_algo_name = algo_options[dropdown_scroll_offset + i]
+                                algo = choose_algorithm(selected_algo_name)
+                                dropdown_open = False
+                                break
+                elif event.button == 4:  # Mouse wheel up
+                    if dropdown_open:
+                        dropdown_scroll_offset = max(0, dropdown_scroll_offset - 1)
+                elif event.button == 5:  # Mouse wheel down
+                    if dropdown_open:
+                        max_scroll = max(0, len(algo_options) - max_visible_items)
+                        dropdown_scroll_offset = min(max_scroll, dropdown_scroll_offset + 1)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
@@ -244,6 +276,8 @@ def main():
                     delivery_state = "IDLE"
                     delivery_log = []
                     delivered_count = 0
+                    dropdown_open = False
+                    dropdown_scroll_offset = 0
                     # Re-collect houses
                     houses = []
                     for i in range(GRID_SIZE):
@@ -257,50 +291,19 @@ def main():
                         delivery_state = "PICKING"
                         delivery_log = [f"[PICKING] Flying to Warehouse at ({goal[0]}, {goal[1]})"]
                         delivered_count = 0
+                        delivered_houses = []
                         current_target = goal  # warehouse position
                     
                     algo = choose_algorithm(selected_algo_name)
                     path, total_cost, visited, runtime_ms = compute_path_to_target(start, current_target, grid, algo)
+                    if not path:
+                        delivery_log.append(f"[ERROR] {selected_algo_name}: Cannot find path to target!")
+                        delivery_state = "IDLE"
                     anim_index = 0
                     anim_time = pygame.time.get_ticks()
                     state_change_time = pygame.time.get_ticks()
-                elif event.key == pygame.K_c:
-                    # compare all algorithms
-                    summaries = []
-                    for name, instance in ALG_MAP.items():
-                        start_state = (start[0], start[1], tuple(tuple(row) for row in grid))
-                        t0 = time.time()
-                        p, logs = instance.solve(start_state)
-                        t1 = time.time()
-                        visited_set = logs_to_visited(logs)
-                        if p is None:
-                            summaries.append((name, len(visited_set), 0, 0, int((t1 - t0)*1000)))
-                        else:
-                            # compute cost
-                            s = start_state
-                            c = 0
-                            positions = [(s[0], s[1])]
-                            for a in p:
-                                ns = instance.apply_action(s, a)
-                                c += instance.get_cost(s, a, ns)
-                                positions.append((ns[0], ns[1]))
-                                s = ns
-                            summaries.append((name, len(visited_set), len(p), c, int((t1 - t0)*1000)))
-                    # print summary to console and also show first lines on screen
-                    print("COMPARE ALL RESULTS")
-                    for row in summaries:
-                        print(f"{row[0]:12} Nodes:{row[1]:4} PathLen:{row[2]:4} Cost:{row[3]:4} Time:{row[4]}ms")
 
-                elif event.key == pygame.K_1:
-                    selected_algo_name = 'BFS'
-                elif event.key == pygame.K_2:
-                    selected_algo_name = 'DFS'
-                elif event.key == pygame.K_3:
-                    selected_algo_name = 'UCS'
-                elif event.key == pygame.K_4:
-                    selected_algo_name = 'Greedy'
-                elif event.key == pygame.K_5:
-                    selected_algo_name = 'A*'
+
 
         screen.fill((30, 30, 30))
         
@@ -312,36 +315,45 @@ def main():
             if step >= len(path):
                 # Drone reached goal
                 if delivery_state == "PICKING":
-                    delivery_log.append(f"[PICKED UP] At Warehouse. Now delivering...")
+                    delivery_log.append(f"[PICKED UP] At Warehouse. Now delivering all houses...")
                     if houses:
                         delivery_state = "DELIVERING"
-                        current_target = houses[0]
-                        delivery_log.append(f"[DELIVERING] Flying to House at ({current_target[0]}, {current_target[1]})")
+                        # Create delivery order: visit all remaining houses
+                        delivery_targets = houses.copy()  # All houses in order
+                        current_target = delivery_targets[0]
+                        delivery_log.append(f"[DELIVERING] Tour Start → House #{1} at ({current_target[0]}, {current_target[1]})")
                         state_change_time = now
                     else:
                         delivery_state = "IDLE"
                         delivery_log.append("[DONE] No houses to deliver")
 
                 elif delivery_state == "DELIVERING":
+                    # Mark house as delivered
                     delivered_count += 1
                     delivery_log.append(f"[DELIVERED] House #{delivered_count} at ({current_target[0]}, {current_target[1]})")
                     delivered_houses.append(current_target)
                     grid[current_target[0]][current_target[1]] = 0
-                    houses.pop(0)
-                    delivery_state = "RETURNING"
-                    current_target = base
-                    delivery_log.append(f"[RETURNING] Back to Drone Base at ({base[0]}, {base[1]})")
-                    state_change_time = now
-
-                elif delivery_state == "RETURNING":
+                    
+                    # Check if there are more houses to deliver
+                    if houses and current_target == houses[0]:
+                        houses.pop(0)
+                    
                     if houses:
-                        delivery_state = "PICKING"
-                        current_target = goal
-                        delivery_log.append(f"[PICKING] Flying to Warehouse at ({goal[0]}, {goal[1]})")
+                        # Go to next house (no return to warehouse)
+                        current_target = houses[0]
+                        delivery_log.append(f"[DELIVERING] → House #{delivered_count + 1} at ({current_target[0]}, {current_target[1]})")
                         state_change_time = now
                     else:
-                        delivery_state = "IDLE"
-                        delivery_log.append("[DONE] All houses delivered!")
+                        # All houses delivered, return to base
+                        delivery_state = "RETURNING"
+                        current_target = base
+                        delivery_log.append(f"[RETURNING] All delivered! Flying back to Base at ({base[0]}, {base[1]})")
+                        state_change_time = now
+
+                elif delivery_state == "RETURNING":
+                    # Returned to base, mission complete
+                    delivery_state = "IDLE"
+                    delivery_log.append("[DONE] Mission Complete! All packages delivered and returned.")
 
                 # Update current drone position after arriving at the target
                 start = path[-1]
@@ -350,6 +362,9 @@ def main():
                 if delivery_state != "IDLE":
                     algo = choose_algorithm(selected_algo_name)
                     path, total_cost, visited, runtime_ms = compute_path_to_target(start, current_target, grid, algo)
+                    if not path:
+                        delivery_log.append(f"[ERROR] {selected_algo_name}: Cannot find path to target!")
+                        delivery_state = "IDLE"
                     anim_time = now
                     state_change_time = now
 
@@ -359,18 +374,44 @@ def main():
         pygame.draw.rect(screen, (40, 40, 40), (panel_x, panel_y, LEFT_PANEL - PADDING, GRID_SIZE * CELL_SIZE))
 
         screen.blit(bigfont.render('THUẬT TOÁN', True, (200, 200, 200)), (panel_x + 10, panel_y + 10))
-        algs = ['BFS', 'DFS', 'UCS', 'Greedy', 'A*']
-        for i, a in enumerate(algs):
-            y = panel_y + 50 + i * (font_size + 5)
-            color = (255, 255, 0) if a == selected_algo_name else (200, 200, 200)
-            screen.blit(font.render(f"{i+1}. {a}", True, color), (panel_x + 16, y))
-
+        
+        # Draw algorithm dropdown
+        dropdown_y = panel_y + 50
+        dropdown_height = font_size + 10
+        dropdown_rect = pygame.Rect(panel_x + 10, dropdown_y, LEFT_PANEL - PADDING - 20, dropdown_height)
+        pygame.draw.rect(screen, (60, 60, 60), dropdown_rect, 2)
+        screen.blit(font.render(selected_algo_name, True, (255, 255, 100)), (panel_x + 15, dropdown_y + 5))
+        
+        # Draw dropdown arrow
+        arrow_x = dropdown_rect.right - 15
+        arrow_y = dropdown_rect.centery
+        pygame.draw.polygon(screen, (200, 200, 200), [(arrow_x, arrow_y - 3), (arrow_x + 5, arrow_y - 3), (arrow_x + 2.5, arrow_y + 3)])
+        
+        # Draw options if dropdown is open
+        options_rects = []
+        if dropdown_open:
+            visible_items = algo_options[dropdown_scroll_offset:dropdown_scroll_offset + max_visible_items]
+            for i, opt in enumerate(visible_items):
+                opt_y = dropdown_y + dropdown_height + i * (font_size + 5)
+                opt_rect = pygame.Rect(panel_x + 10, opt_y, LEFT_PANEL - PADDING - 20, font_size + 5)
+                opt_color = (100, 100, 150) if opt == selected_algo_name else (70, 70, 70)
+                pygame.draw.rect(screen, opt_color, opt_rect)
+                pygame.draw.rect(screen, (200, 200, 200), opt_rect, 1)
+                opt_text_color = (255, 255, 100) if opt == selected_algo_name else (200, 200, 200)
+                screen.blit(font.render(opt[:20], True, opt_text_color), (panel_x + 15, opt_y + 3))  # Truncate long names
+                options_rects.append(opt_rect)
+            
+            # Draw scroll indicator if there are more items
+            if len(algo_options) > max_visible_items:
+                scroll_text = f"↑↓ {dropdown_scroll_offset+1}/{len(algo_options)}"
+                scroll_color = (150, 150, 100)
+                screen.blit(font.render(scroll_text, True, scroll_color), (panel_x + 15, dropdown_y + dropdown_height + max_visible_items * (font_size + 5) + 3))
+        
         # controls
         ctrl_y = panel_y + 220
         screen.blit(font.render('[SPACE] START', True, (200,200,200)), (panel_x + 10, ctrl_y))
         screen.blit(font.render('[R] RANDOM', True, (200,200,200)), (panel_x + 10, ctrl_y + font_size + 5))
-        screen.blit(font.render('[C] COMPARE', True, (200,200,200)), (panel_x + 10, ctrl_y + 2*(font_size + 5)))
-        screen.blit(font.render('[ESC] EXIT', True, (200,200,200)), (panel_x + 10, ctrl_y + 3*(font_size + 5)))
+        screen.blit(font.render('[ESC] EXIT', True, (200,200,200)), (panel_x + 10, ctrl_y + 2*(font_size + 5)))
 
         # Draw grid
         grid_x0 = LEFT_PANEL + PADDING
@@ -438,12 +479,13 @@ def main():
             now = pygame.time.get_ticks()
             # one step per 150ms
             step = (now - anim_time) // 150
-            if step < len(path):
-                dx, dy = path[step]
-                if assets.get('drone'):
-                    screen.blit(assets['drone'], (grid_x0 + dy*CELL_SIZE, grid_y0 + dx*CELL_SIZE))
-                else:
-                    pygame.draw.circle(screen, (255, 0, 0), (grid_x0 + dy*CELL_SIZE + CELL_SIZE//2, grid_y0 + dx*CELL_SIZE + CELL_SIZE//2), CELL_SIZE//3)
+            # Clamp step to not exceed path length
+            step = min(step, len(path) - 1)
+            dx, dy = path[step]
+            if assets.get('drone'):
+                screen.blit(assets['drone'], (grid_x0 + dy*CELL_SIZE, grid_y0 + dx*CELL_SIZE))
+            else:
+                pygame.draw.circle(screen, (255, 0, 0), (grid_x0 + dy*CELL_SIZE + CELL_SIZE//2, grid_y0 + dx*CELL_SIZE + CELL_SIZE//2), CELL_SIZE//3)
         else:
             # draw drone at start if no path yet
             sx, sy = start
