@@ -1,6 +1,7 @@
 import os
 import pygame
 import random
+import copy
 import BFS as bfs
 import DFS as dfs
 import IDF as idf
@@ -12,6 +13,7 @@ import Leo_Đồi_Đơn_Giản as hill_simple
 import Leo_Đồi_Dốc_Nhất as hill_steep
 import Leo_Đồi_Ngẫu_Nhiên as hill_random
 import Leo_Đồi_Ngẫu_Nhiên_Có_Khởi_Tạo as hill_random_init
+import BFS_MTPT as bfs_mtpt
 
 pygame.init()
 
@@ -89,7 +91,7 @@ faster_btn = pygame.Rect(500, CONTROL_BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT)
 scroll_up_btn = pygame.Rect(LOG_X + LOG_WIDTH - 30, LOG_Y + 20, 20, 20)
 scroll_down_btn = pygame.Rect(LOG_X + LOG_WIDTH - 30, LOG_Y + LOG_HEIGHT - 40, 20, 20)
 
-ALGORITHM_NAMES = ["UCS", "BFS", "DFS", "IDF", "IDA_sao", "LD_ĐG", "LD_DN", "LD_NN", "LD_NN_KT", "SA", "LBS"]
+ALGORITHM_NAMES = ["UCS", "BFS", "DFS", "IDF", "IDA_sao", "LD_ĐG", "LD_DN", "LD_NN", "LD_NN_KT", "SA", "LBS", "BFS_MTPT"]
 # Combobox (placed under Event Log on the right, aligned with buttons)
 COMBO_X = LOG_X + LOG_WIDTH - 182 - 12
 COMBO_Y = CONTROL_BUTTON_Y
@@ -106,6 +108,10 @@ dropdown_scroll = 0
 def run_idf(grid, start_i, start_j):
     return idf.IDF(grid, start_i, start_j)
 
+def run_bfs_mtpt(grid, start_i, start_j):
+    # BFS_MTPT has fixed grids and positions, ignores input parameters
+    return bfs_mtpt.BFS_MTPT()
+
 algorithms = {
     "UCS": ucs.UCS,
     "BFS": bfs.BFS,
@@ -118,6 +124,7 @@ algorithms = {
     "LD_NN_KT": hill_random_init.Leo_Đồi_Ngẫu_Nhiên_Có_Khởi_Tạo,
     "SA": sa.LA,
     "LBS": local_beam.Local_Beam_Search,
+    "BFS_MTPT": run_bfs_mtpt,
 }
 # ======================
 # GRID / ROBOT
@@ -268,6 +275,12 @@ while running_app:
                             selected_algorithm = name
                             status_text = f"Selected {selected_algorithm}"
                             append_log(f"Selected algorithm: {selected_algorithm}")
+                            if selected_algorithm == "BFS_MTPT":
+                                temp_path_states, temp_actions = bfs_mtpt.BFS_MTPT()
+                                if temp_path_states:
+                                    grid = copy.deepcopy(temp_path_states[0])
+                                    robot_i, robot_j = 0, 1
+                                    append_log("BFS_MTPT initial grid loaded from path_states[0].")
                             dropdown_open = False
                             clicked_item = True
                             break
@@ -284,6 +297,9 @@ while running_app:
                     else:
                         try:
                             path_states, actions = algorithm_fn(grid, robot_i, robot_j)
+                            if selected_algorithm == "BFS_MTPT" and path_states:
+                                grid = copy.deepcopy(path_states[0])
+                                robot_i, robot_j = 0, 1
                         except TypeError:
                             path_states, actions = [], []
                     step = 0
