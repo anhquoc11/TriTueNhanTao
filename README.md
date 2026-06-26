@@ -21,7 +21,7 @@ Mục tiêu chính của repository là chuyển hóa các kiến thức lý thu
 
 ### ✨ Tính năng nổi bật
 
-* **Hệ thống đa dạng thuật toán:** Cài đặt nhiều giải thuật AI kinh điển như BFS, DFS, IDS, UCS, Greedy Best-First Search, A*, IDA*, và các phương pháp tìm kiếm cục bộ như Hill Climbing.
+* **Hệ thống đa dạng thuật toán:** Hiện thực nhiều giải thuật AI kinh điển, bao gồm các thuật toán tìm kiếm mù, tìm kiếm có thông tin, tìm kiếm cục bộ, giải bài toán thỏa mãn ràng buộc (CSP), tìm kiếm trong môi trường không chắc chắn và tìm kiếm trong trò chơi.
 * **Trực quan hóa quá trình tìm kiếm:** Giao diện mô phỏng trực quan giúp quan sát rõ từng bước hoạt động của thuật toán.
 * **Theo dõi thời gian thực:** Hiển thị log chi tiết, trạng thái từng bước và tiến trình xử lý của tác nhân trong quá trình tìm kiếm.
 
