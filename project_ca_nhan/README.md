@@ -83,6 +83,10 @@ This repository demonstrates the implementation and visualization of classical A
 
 ```text
 Artificial-Intelligence/
+├── Demo/
+│   ├── vacuum.gif
+│   ├── ToMau.gif
+│   └── Caro.gif
 │
 ├── Caro/
 │   ├── algorithms/
@@ -129,6 +133,32 @@ Artificial-Intelligence/
 │
 └── README.md
 ```
+---
+
+# 📸 Demo
+
+## 🧹 Vacuum Cleaner
+
+<p align="center">
+    <img src="Demo/vacuum.gif" alt="Vacuum Cleaner Demo" width="800"/>
+</p>
+
+---
+
+## 🗺️ Map Coloring
+
+<p align="center">
+    <img src="Demo/ToMau.gif" alt="Map Coloring Demo" width="800"/>
+</p>
+
+---
+
+## ❌ Tic-Tac-Toe
+
+<p align="center">
+    <img src="Demo/Caro.gif" alt="Tic-Tac-Toe Demo" width="500"/>
+</p>
+
 ---
 
 # ⚙️ Installation
