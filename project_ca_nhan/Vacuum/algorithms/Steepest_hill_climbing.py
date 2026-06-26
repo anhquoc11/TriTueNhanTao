@@ -1,0 +1,32 @@
+import copy
+from algorithms import Utility
+def Steepest_hill_climbing(grid, start_i, start_j):
+    start_state = copy.deepcopy(grid)
+    start_state[start_i][start_j] = 0
+    h_parent = Utility.count_dirty_cells(start_state)
+    if h_parent == 0:
+        return [start_state], []
+    state_parent = start_state
+    i_parent, j_parent = start_i, start_j
+    path_states = [state_parent]
+    actions = []
+    while True:
+        children = []
+        move_list = Utility.get_actions(i_parent,j_parent,state_parent)
+        for action in move_list:
+            i_child, j_child = Utility.next_pos(i_parent, j_parent, action)
+            state_child = copy.deepcopy(state_parent)
+            state_child[i_child][j_child] = 0 
+            h_child = Utility.count_dirty_cells(state_child)
+            if h_child < h_parent:
+                children.append([i_child,j_child,state_child,h_child,action])
+        if not children: break
+        choice_child = min(children,key = lambda x: x[3])
+        h_parent = choice_child[3]
+        state_parent = choice_child[2]
+        i_parent,j_parent = choice_child[0],choice_child[1]
+        path_states.append(state_parent)
+        actions.append(choice_child[4])
+        if h_parent == 0:
+            return path_states, actions
+    return [], []
