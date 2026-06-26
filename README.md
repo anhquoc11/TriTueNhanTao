@@ -25,7 +25,7 @@ Mục tiêu chính của repository là chuyển hóa các kiến thức lý thu
 * **Trực quan hóa quá trình tìm kiếm:** Giao diện mô phỏng trực quan giúp quan sát rõ từng bước hoạt động của thuật toán.
 * **Theo dõi thời gian thực:** Hiển thị log chi tiết, trạng thái từng bước và tiến trình xử lý của tác nhân trong quá trình tìm kiếm.
 
-🔗 **Liên kết:** [Project cá nhân của tôi](https://github.com/anhquoc11/TriTueNhanTao/tree/a3dd2ce8dfa6b125bd9fea88614b8d77f1bccc8e/project_ca_nhan)
+🔗 **Liên kết:** [Project cá nhân của tôi](https://github.com/anhquoc11/TriTueNhanTao/tree/0b10eb906bbceff9c8eb296b8cd63708e5b83c8f/project_ca_nhan)
 ## 🧠 Các thuật toán đã hiện thực
 ### 1. Tìm kiếm mù (Uninformed Search)
 
